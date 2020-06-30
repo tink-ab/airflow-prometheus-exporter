@@ -388,7 +388,7 @@ if RBAC:
     from flask_appbuilder import BaseView as FABBaseView, expose as FABexpose
 
     class RBACMetrics(FABBaseView):
-        route_base = "/admin/metrics/"
+        route_base = "/metrics/"
 
         @FABexpose("/")
         def list(self):
