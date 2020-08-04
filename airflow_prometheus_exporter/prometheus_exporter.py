@@ -2,14 +2,13 @@
 import json
 import pickle
 from contextlib import contextmanager
-from datetime import timedelta
 
 from airflow.configuration import conf
 from airflow.models import DagModel, DagRun, TaskInstance, TaskFail, XCom
 from airflow.plugins_manager import AirflowPlugin
 from airflow.settings import RBAC, Session
-from airflow.utils.state import State
 from airflow.utils.log.logging_mixin import LoggingMixin
+from airflow.utils.state import State
 from flask import Response
 from flask_admin import BaseView, expose
 from prometheus_client import generate_latest, REGISTRY
@@ -260,32 +259,6 @@ def get_num_queued_tasks():
         return session.query(TaskInstance).filter(TaskInstance.state == State.QUEUED).count()
 
 
-def get_dag_success_age_seconds(max_age_days=14):
-    with session_scope(Session) as session:
-        query = (
-            session.query(
-                DagRun.dag_id.label("dag_id"),
-                func.max(DagRun.end_date).label("end_date"),
-                (func.now() - func.max(DagRun.end_date)).label("age_seconds"),
-            )
-            .filter(
-                DagRun.state == State.SUCCESS,
-                DagRun.end_date > (func.now() - timedelta(days=max_age_days)),
-            )
-            .group_by(DagRun.dag_id)
-        )
-
-        result = query.all()
-
-    dag_success_age = GaugeMetricFamily(
-        "airflow_dag_success_age_seconds", "Age of last successful run per dag", labels=["dag_id"]
-    )
-    for r in result:
-        dag_success_age.add_metric([r.dag_id], r.age_seconds.total_seconds())
-
-    return dag_success_age
-
-
 class MetricsCollector(object):
     """Metrics Collector for prometheus."""
 
@@ -378,8 +351,6 @@ class MetricsCollector(object):
         num_queued_tasks = get_num_queued_tasks()
         num_queued_tasks_metric.add_metric([], num_queued_tasks)
         yield num_queued_tasks_metric
-
-        yield get_dag_success_age_seconds()
 
 
 REGISTRY.register(MetricsCollector())
